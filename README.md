@@ -1,4 +1,7 @@
 # SDGE Technician Utilization Analysis
+by Angela Hu, Subika Haider, Weijie (Jack) Zhang, Nathan Dang
+
+*Note: we cannot publish the SDG&E dataset or the graphs that are produced in this repo to protect the privacy of their data.*
 
 ## Project Description
 
