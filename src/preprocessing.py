@@ -272,3 +272,136 @@ def prepare_job_lifecycle_analysis(DF):
                                            DF_lifecycle['COMPLETED']).dt.total_seconds() / 3600
     
     return DF_lifecycle
+
+
+def prepare_hourly_data(DF):
+    '''
+    Prepare hourly technician activity data from order timestamps.
+    
+    Args:
+        DF (pd.DataFrame): Hourly dataset
+    
+    Returns:
+        pd.DataFrame: Hourly technician activity with utilization metrics
+    '''
+
+    # Calculate actual work duration using timestamps
+    DF['WORK_START'] = DF['ENROUTE_AT']  # When work actually started
+    DF['WORK_END'] = DF['COMPLETED']     # When work actually ended
+
+    # Calculate actual work duration in minutes
+    DF['ACTUAL_WORK_DURATION'] = (DF['WORK_END'] - DF['WORK_START']).dt.total_seconds() / 60
+
+    # Create date ranges for orders spanning multiple days
+    def get_work_dates(start_time, end_time):
+        """Get all dates between start and end of work"""
+        if pd.isna(start_time) or pd.isna(end_time):
+            return []
+        
+        start_date = start_time.date()
+        end_date = end_time.date()
+        
+        dates = []
+        current_date = start_date
+        while current_date <= end_date:
+            dates.append(current_date)
+            current_date += pd.Timedelta(days=1)
+        
+        return dates
+
+    # Calculate daily work time for each order
+    expanded_records = []
+
+    for idx, row in DF.iterrows():
+        if pd.notna(row['WORK_START']) and pd.notna(row['WORK_END']):
+            work_dates = get_work_dates(row['WORK_START'], row['WORK_END'])
+            
+            if len(work_dates) == 1:
+                # Single day work
+                expanded_records.append({
+                    'TECH_ID': row['LOGON_ID'],
+                    'DATE': work_dates[0],
+                    'DAILY_WORK_TIME': row['ACTUAL_WORK_DURATION'],
+                })
+            else:
+                # Multi-day work - distribute time across days
+                total_duration = row['ACTUAL_WORK_DURATION']
+                daily_duration = total_duration / len(work_dates)
+                
+                for work_date in work_dates:
+                    expanded_records.append({
+                        'TECH_ID': row['LOGON_ID'],
+                        'DATE': work_date,
+                        'DAILY_WORK_TIME': daily_duration,
+                    })
+
+    expanded_df = pd.DataFrame(expanded_records)
+
+    # Extract hourly data
+    expanded_df['WORK_START_HOUR'] = pd.to_datetime(expanded_df['WORK_START']).dt.hour
+    expanded_df['WORK_END_HOUR'] = pd.to_datetime(expanded_df['WORK_END']).dt.hour
+
+    # Hourly analysis with utilization and idle time calculations
+    def create_hourly_activity_data():
+        hourly_records = []
+        
+        for idx, row in expanded_df.iterrows():
+            if pd.notna(row['WORK_START_HOUR']) and pd.notna(row['WORK_END_HOUR']):
+                start_hour = int(row['WORK_START_HOUR'])
+                end_hour = int(row['WORK_END_HOUR'])
+                duration = row['DAILY_WORK_TIME']
+                
+                # If work spans multiple hours, distribute time across hours
+                if start_hour == end_hour:
+                    # Work completed within same hour
+                    hourly_records.append({
+                        'TECH_ID': row['TECH_ID'],
+                        'DATE': row['DATE'],
+                        'HOUR': start_hour,
+                        'WORK_MINUTES': duration,
+                        'ORDER_COUNT': 1
+                    })
+                else:
+                    # Work spans multiple hours - distribute evenly
+                    if end_hour < start_hour:  # Work crosses midnight
+                        hours_worked = (24 - start_hour) + end_hour
+                    else:
+                        hours_worked = end_hour - start_hour + 1
+                    
+                    minutes_per_hour = duration / hours_worked
+                    
+                    current_hour = start_hour
+                    while True:
+                        hourly_records.append({
+                            'TECH_ID': row['TECH_ID'],
+                            'DATE': row['DATE'],
+                            'HOUR': current_hour,
+                            'WORK_MINUTES': minutes_per_hour,
+                            'ORDER_COUNT': 1/hours_worked  # Fraction of order per hour
+                        })
+                        
+                        current_hour = (current_hour + 1) % 24
+                        if current_hour == (end_hour % 24):
+                            break
+        
+        return pd.DataFrame(hourly_records)
+
+    hourly_df = create_hourly_activity_data()
+
+    # Calculate utilization and idle time for each tech-hour combination
+    HOUR_MINUTES = 60  # 60 minutes per hour
+
+    # Calculate utilization rate and idle time for each record
+    hourly_df['UTILIZATION_RATE'] = (hourly_df['WORK_MINUTES'] / HOUR_MINUTES).clip(upper=1.0)  # Cap at 100%
+    hourly_df['IDLE_MINUTES'] = HOUR_MINUTES - hourly_df['WORK_MINUTES']
+    hourly_df['IDLE_MINUTES'] = hourly_df['IDLE_MINUTES'].clip(lower=0)  # No negative idle time
+    hourly_df['IDLE_TIME_PCT'] = (hourly_df['IDLE_MINUTES'] / HOUR_MINUTES) * 100
+
+    # Add additional time dimensions for analysis
+    hourly_df['DAY_OF_WEEK'] = pd.to_datetime(hourly_df['DATE']).dt.day_name()
+    hourly_df['MONTH'] = pd.to_datetime(hourly_df['DATE']).dt.month_name()
+    hourly_df['IS_WEEKEND'] = pd.to_datetime(hourly_df['DATE']).dt.dayofweek.isin([5, 6])
+    hourly_df['IS_BUSINESS_HOUR'] = hourly_df['HOUR'].between(8, 17)
+
+    return hourly_df
+
