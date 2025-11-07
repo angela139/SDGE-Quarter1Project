@@ -13,10 +13,7 @@ Before running the analysis, ensure you have the following Python packages insta
 
 ### Core Dependencies
 ```bash
-pip install pandas
-pip install plotly
-pip install requests
-pip install pyarrow
+pip install -r requirements.txt
 ```
 
 ## How to Run the Code
@@ -35,7 +32,7 @@ pip install pyarrow
 
 #### Option 1: Run Full Analysis Pipeline
 ```bash
-python eda.py
+python src/eda.py
 ```
 This will execute the complete analysis and generate all visualizations.
 
