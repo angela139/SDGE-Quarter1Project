@@ -428,6 +428,93 @@ def utilization_hourly_plot(hourly_df):
     
     return fig
 
+
+def utilization_job_counts_plot(daily_utilization):
+    """
+    Create Bar Chart Analyzing Utilization Rate By Ranges of Job Counts Assignment
+    
+    Args:
+        daily_uitlization (pd.DataFrame): Utilization data by field techs
+    
+    Returns:
+        plotly express bar chart displaying utilization rate in percentages by ranges of job counts
+    """
+    util_job_counts = daily_utilization.copy()
+
+    bins = [0, 3, 6, 9, 12, 15, 18, float('inf')]
+    labels = ['1–3', '4–6', '7–9', '10–12', '13–15', '16–18', '19+']
+
+    util_job_counts['JOB_COUNT_RANGE'] = pd.cut(util_job_counts['JOBS_COUNT'], bins=bins, labels=labels, right=True)
+
+    job_range_avg = (
+        util_job_counts
+        .groupby('JOB_COUNT_RANGE', observed=False)['UTILIZATION_RATE_%']
+        .mean()
+        .reset_index()
+    )
+
+    fig1 = px.bar(
+        job_range_avg,
+        x='JOB_COUNT_RANGE',
+        y='UTILIZATION_RATE_%',
+        text=job_range_avg['UTILIZATION_RATE_%'].round(1).astype(str) + '%',
+        title='Average Utilization Rate by Job Counts',
+        labels={'UTILIZATION_RATE_%': 'Average Utilization Rate (%)', 'JOB_COUNT_RANGE': 'Job Count Range'}
+    )
+
+    fig1.update_layout(template='simple_white')
+    fig1.show()
+
+
+def utilization_days_week_plot(daily_utilization):  
+    """
+    Create Bar Chart Analyzing Utilization Rate By Days of the Week
+    
+    Args:
+        daily_uitlization (pd.DataFrame): Utilization data by field techs
+    
+    Returns:
+        plotly express bar chart displaying utilization rate in percentages by days of the week
+    """
+    util_day_ofweek = daily_utilization.copy()
+
+    util_day_ofweek['DAY_OF_WEEK'] = util_day_ofweek['DATE'].dt.day_of_week
+    map_day = {
+        0: 'Monday',
+        1: 'Tuesday',
+        2: 'Wednesday',
+        3: 'Thursday',
+        4: 'Friday',
+        5: 'Saturday',
+        6: 'Sunday'
+    }
+
+    util_day_ofweek['DAY_OF_WEEK'] = util_day_ofweek['DAY_OF_WEEK'].map(map_day) 
+
+    day_week_avg = (
+        util_day_ofweek
+        .groupby('DAY_OF_WEEK', observed=False)['UTILIZATION_RATE_%']
+        .mean()
+        .reset_index()
+    )
+
+    weekday_in_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    day_week_avg['DAY_OF_WEEK'] = pd.Categorical(day_week_avg['DAY_OF_WEEK'], categories=weekday_in_order, ordered=True)
+    day_week_avg = day_week_avg.sort_values('DAY_OF_WEEK')
+
+    fig2 = px.bar(
+        day_week_avg,
+        x='DAY_OF_WEEK',
+        y='UTILIZATION_RATE_%',
+        text=day_week_avg['UTILIZATION_RATE_%'].round(1).astype(str) + '%',
+        title='Average Utilization Rate by Days of the Week',
+        labels={'UTILIZATION_RATE_%': 'Average Utilization Rate (%)', 'DAY_OF_WEEK': 'Days of the Week'}
+    )
+
+    fig2.update_layout(template='simple_white')
+    fig2.show()
+
+
 def run_full_analysis():
     """
     Run the complete technician utilization analysis pipeline.
