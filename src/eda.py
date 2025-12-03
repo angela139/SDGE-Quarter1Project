@@ -1,6 +1,6 @@
 import plotly.express as px
 
-from src.preprocessing import (
+from preprocessing import (
     load_data,
     load_california_geojson,
     calculate_zip_utilization,

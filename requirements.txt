@@ -1,6 +1,15 @@
+# Core data processing
 pandas
+numpy
+
+# Visualization
+matplotlib
 plotly
-plotly-express
-requests
-pyarrow
 dash
+
+# Data I/O
+pyarrow
+requests
+
+# Scientific computing
+scipy
