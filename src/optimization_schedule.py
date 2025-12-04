@@ -130,7 +130,7 @@ def plot_job_counts(planned_counts, actual_counts):
         marker_color='salmon'
     ))
     fig.update_layout(
-        title='Planned vs Actual Jobs Scheduled Per Day',
+        title='Planned vs Actual Jobs Scheduled Per Day for METRO-ELECTRIC (Jan 2023)',
         xaxis_title='Date',
         yaxis_title='Number of Jobs',
         barmode='group',
