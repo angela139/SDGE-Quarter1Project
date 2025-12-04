@@ -2,7 +2,7 @@
 
 by Angela Hu, Subika Haider, Weijie (Jack) Zhang, Nathan Dang
 
-*Note: we cannot publish the SDG&E dataset or the graphs that are produced in this repo to protect the privacy of their data.*
+_Note: we cannot publish the SDG&E dataset or the graphs that are produced in this repo to protect the privacy of their data._
 
 ## Project Description
 
@@ -53,6 +53,31 @@ Interactive dashboard module using Dash framework:
 - **Interactive filtering**: User controls for date ranges, job types, and geographic regions
 - **`start_app_dashboard()`**: Main function to launch the interactive web application
 
+### `optimization_schedule.py`
+
+Job scheduling optimization module using OR-Tools CP-SAT solver:
+
+- **Constraint-based scheduling**: Uses Google OR-Tools CP-SAT solver to create optimal technician crew schedules
+- **Schedule generation**: Assigns jobs to crews and workdays while respecting:
+  - Job earliest start dates and due dates
+  - Crew capacity constraints (configurable crew hours per shift)
+  - Holiday and weekend exclusions
+  - Multiple crew availability
+- **Optimization objective**: Minimizes the number of late jobs (jobs scheduled after their due date)
+- **Key functions**:
+  - `workdays_in_month()`: Generates list of valid workdays excluding weekends and holidays
+  - `create_schedule()`: Core optimization function that creates crew schedules using constraint programming
+  - `merge_actuals()`: Compares planned schedules with actual job completion data
+  - `plot_job_counts()`: Visualizes planned vs actual job distribution over time
+- **Preprocessing integration**: Imports `load_schedule_data()` and `filter_jobs()` from preprocessing module for data loading and filtering
+- **Configurable parameters**:
+  - Number of crews (default: 3)
+  - Net shift hours (default: 8)
+  - Solver timeout (default: 60 seconds)
+  - Number of search workers (default: 8 for parallel search)
+
+The module supports analyzing schedule feasibility and identifying potential bottlenecks in crew capacity planning.
+
 ## Required Packages
 
 Before running the analysis, ensure you have the following Python packages installed:
@@ -68,13 +93,16 @@ pip install -r requirements.txt
 ### Prerequisites
 
 1. Ensure all required packages are installed (see above)
-2. Place the following parquet files in a `sort/` directory:
+2. **For utilization analysis**, place the following parquet files in a `sort/` directory:
    - `REP_ORD_ORDER.parquet`
    - `REP_ORD_JOB_CODE.parquet`
    - `REP_ORD_ORDER_STATE.parquet`
    - `REP_ASN_ASSIGNMENT.parquet`
    - `REP_LAB_RESOURCE.parquet`
    - `REP_LAB_USER.parquet`
+3. **For schedule optimization**, place the following CSV files in the project root directory:
+   - `Assignment2_Planning.csv`
+   - `Assignment2_Actuals.csv`
 
 ### Option A: Using Docker (Recommended)
 
@@ -84,21 +112,36 @@ Build and run using Docker for a consistent environment:
 # Build the Docker image
 docker build -t sdge-tech-analysis .
 
-# Run analysis script directly
+# Run utilization analysis
 docker run -v "$(pwd)":/home/jovyan/work -w /home/jovyan/work sdge-tech-analysis python src/eda.py
+
+# Run schedule optimization
+docker run -v "$(pwd)":/home/jovyan/work -w /home/jovyan/work sdge-tech-analysis python src/optimization_schedule.py
 ```
 
 ### Option B: Local Python Environment
 
 #### Option 1: Run Full Analysis Pipeline
 
+**Utilization Analysis:**
+
 ```bash
 python src/eda.py
 ```
 
-This will execute the complete analysis and generate all visualizations.
+This will execute the complete utilization analysis and generate all visualizations.
+
+**Schedule Optimization:**
+
+```bash
+python src/optimization_schedule.py
+```
+
+This will run the optimization scheduler to create crew schedules and compare them with actual job completion data.
 
 #### Option 2: Run Individual Components
+
+**Utilization Analysis:**
 
 ```python
 from preprocessing import load_data, calculate_technician_utilization
@@ -113,4 +156,36 @@ tech_util = calculate_technician_utilization(DF)
 # Create visualization
 fig = plot_utilization_histogram(tech_util)
 fig.show()
+```
+
+**Schedule Optimization:**
+
+```python
+from preprocessing import load_schedule_data, filter_jobs
+from optimization_schedule import create_schedule, merge_actuals, plot_job_counts
+import pandas as pd
+from datetime import date
+
+# Load planning and actual data
+planning_df, actuals_df = load_schedule_data("Assignment2_Planning.csv", "Assignment2_Actuals.csv")
+
+# Filter jobs by due date and district
+chosen_due = pd.Timestamp("2023-04-30 23:59:00")
+chosen_district = "METRO-ELECTRIC"
+district_df = filter_jobs(planning_df, chosen_due, chosen_district)
+
+# Create optimized schedule
+year, month = 2023, 1
+holidays = [date(2023, 1, 2), date(2023, 1, 16)]  # New Year's Day observed, MLK Day
+sched_df = create_schedule(district_df, year, month, holidays=holidays, num_crews=3)
+
+# Compare with actual schedules
+if not sched_df.empty:
+    merged_df = merge_actuals(sched_df, actuals_df)
+    print(merged_df)
+
+    # Visualize planned vs actual
+    planned_counts = sched_df['SCHEDULEDDATE'].value_counts().sort_index()
+    actual_counts = merged_df['SCHEDULEDSTART'].value_counts().sort_index()
+    plot_job_counts(planned_counts, actual_counts)
 ```

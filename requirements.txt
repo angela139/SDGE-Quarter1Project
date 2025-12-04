@@ -13,3 +13,6 @@ requests
 
 # Scientific computing
 scipy
+
+# Optimization
+ortools

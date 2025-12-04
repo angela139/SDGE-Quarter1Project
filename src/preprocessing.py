@@ -1,6 +1,40 @@
 import pandas as pd
 import requests
 
+
+def load_schedule_data(planning_file, actuals_file):
+    """
+    Load planning and actual data CSVs for schedule optimization.
+    
+    Args:
+        planning_file (str): Path to planning CSV file
+        actuals_file (str): Path to actuals CSV file
+    
+    Returns:
+        tuple: (planning_df, actuals_df) DataFrames
+    """
+    planning_df = pd.read_csv(planning_file, parse_dates=["EARLYSTART","DUEDATE"])
+    actuals_df = pd.read_csv(actuals_file)
+    return planning_df, actuals_df
+
+
+def filter_jobs(df, due_date, district):
+    """
+    Filter jobs by due date and district.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing job data
+        due_date (pd.Timestamp): Due date to filter by
+        district (str): District to filter by
+    
+    Returns:
+        pd.DataFrame: Filtered DataFrame reset with index
+    """
+    group_df = df[df["DUEDATE"] == due_date]
+    district_df = group_df[group_df["DISTRICT"] == district].reset_index(drop=True)
+    return district_df
+
+
 def load_data():
     """
     Load and merge all required datasets for technician analysis.
