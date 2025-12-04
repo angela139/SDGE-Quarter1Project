@@ -16,7 +16,7 @@ def workdays_in_month(year, month, holidays=None):
         d += timedelta(days=1)
     return days
 
-def create_schedule(district_df, year, month, holidays=None, num_crews=3, net_shift_hours=8):
+def create_schedule(district_df, year, month, holidays=None, num_crews=3, net_shift_hours=8, output_file="schedule.csv"):
     """Create an optimized schedule using OR-Tools CP-SAT."""
     workdays = workdays_in_month(year, month, holidays)
     num_days = len(workdays)
@@ -87,6 +87,10 @@ def create_schedule(district_df, year, month, holidays=None, num_crews=3, net_sh
                             "SCHEDULEDDATE": workdays[d].isoformat()
                         })
         sched_df = pd.DataFrame(schedule)
+        
+        sched_df.to_csv(output_file, index=False)
+        print(f"Schedule saved to {output_file}")
+        
         return sched_df
     else:
         print("No feasible schedule found.")
