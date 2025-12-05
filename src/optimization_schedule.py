@@ -3,6 +3,7 @@ import pandas as pd
 from ortools.sat.python import cp_model
 import plotly.graph_objects as go
 from preprocessing import load_schedule_data, filter_jobs
+import numpy as np
 
 
 def workdays_in_month(year, month, holidays=None):
@@ -145,6 +146,54 @@ def plot_job_counts(planned_counts, actual_counts):
     )
     fig.show()
 
+def plot_job_diff(planned_counts, actual_counts):
+    """ Plot differences in actual jobs completed against scheduled plan with Plotly """
+    planned_counts.index = pd.to_datetime(planned_counts.index)
+    actual_counts.index  = pd.to_datetime(actual_counts.index)
+
+    all_dates = pd.date_range(
+        start=min(planned_counts.index.min(), actual_counts.index.min()),
+        end=max(planned_counts.index.max(), actual_counts.index.max())
+    )
+
+    planned_counts = planned_counts.reindex(all_dates, fill_value=0)
+    actual_counts = actual_counts.reindex(all_dates, fill_value=0)
+
+    diff = actual_counts - planned_counts
+    values = diff.values
+    labels = [v if v != 0 else "" for v in values]
+    colors = np.where(values > 0, "green", "red")
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=all_dates,
+        y=values,
+        marker_color=colors,
+        text=labels,
+        textposition="outside",
+        showlegend=False
+    ))
+
+    fig.update_layout(
+        title= 'Differences in Jobs Count Between Planned Schedule and Actual Activity',
+        xaxis_title="Date",
+        yaxis_title="Jobs (Actual - Planned)",
+        template="plotly_white"
+    )
+
+    fig.add_trace(go.Bar(
+        x=[None], y=[None],
+        marker_color="green",
+        name="Ahead"
+    ))
+    fig.add_trace(go.Bar(
+        x=[None], y=[None],
+        marker_color="red",
+        name="Extra (Planning Leftover)"
+    ))
+    
+    fig.show()
+ 
 if __name__ == "__main__":
     planning_file = "Assignment2_Planning.csv"
     actuals_file = "Assignment2_Actuals.csv"
